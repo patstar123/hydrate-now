@@ -1,0 +1,24 @@
+# 以秒为单位，默认1小时
+break_interval_sec: 10
+
+# 以秒为单位，关闭弹框后再次提醒的间隔，默认5秒
+always_remind_interval_sec: 1
+
+# API端口(http)，默认18081
+api_port: 18081
+
+# Logging config
+logging:
+  # log level, valid values: debug, info, warn, error
+  level: info
+  # when set to true, emit json fields
+  json: false
+  # for production setups, enables sampling algorithm
+  # https://github.com/uber-go/zap/blob/master/FAQ.md#why-sample-application-logs
+  sample: false
+  # stops annotating logs with the calling function's file name and line number.
+  # otherwise, all logs are annotated.
+  disable_caller: false
+  # completely disables automatic stacktrace capturing.
+  # otherwise, stacktraces are captured for ErrorLevel and above logs.
+  disable_stacktrace: true
