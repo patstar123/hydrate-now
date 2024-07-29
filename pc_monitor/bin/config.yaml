@@ -1,8 +1,8 @@
 # 以秒为单位，默认1小时
-break_interval_sec: 6
+break_interval_sec: 3600
 
-# 以秒为单位，关闭弹框后再次提醒的间隔，默认5秒
-always_remind_interval_sec: 3
+# 以秒为单位，关闭弹框后再次提醒的间隔，默认10秒
+always_remind_interval_sec: 10
 
 # API端口(http)，默认18081
 api_port: 18081

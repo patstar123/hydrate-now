@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="pc_monitor" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="hydrate_pc" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="hydrate-now" />
     <working_directory value="$PROJECT_DIR$/pc_monitor/bin" />
     <parameters value="run" />

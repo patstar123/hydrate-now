@@ -10,7 +10,10 @@ import (
 	"time"
 )
 
-const ConfigFileName = "config.yaml"
+const (
+	ConfigFileName = "config.yaml"
+	AppName        = "HydrateNow"
+)
 
 type HNReminder struct {
 	config    _Config
@@ -54,7 +57,7 @@ func (r *HNReminder) Init(configFile string, external *ServiceLogger, msgSender 
 		}
 	}
 
-	logger.Warnw("loadConfigFile", nil, "config", r.config, "file", configFile)
+	logger.Infow("loadConfigFile", "config", r.config, "file", configFile)
 
 	r.initHttp()
 	r.msgSender = msgSender
@@ -88,6 +91,18 @@ func (r *HNReminder) Release() base.Result {
 	return base.SUCCESS
 }
 
+func (r *HNReminder) GetStatus() (shouldRemind bool, nextDuration time.Duration) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	now := time.Now()
+	if r.shouldRemind {
+		return true, r.lastRemindTime.Add(time.Duration(r.config.AlwaysRemindIntervalSec) * time.Second).Sub(now)
+	} else {
+		return false, r.lastBreakTime.Add(time.Duration(r.config.BreakIntervalSec) * time.Second).Sub(now)
+	}
+}
+
 func (r *HNReminder) initHttp() {
 	r.http = bu.CreateGinHttp(nil)
 	r.http.Any("/reset_remind", r.onReqResetRemindHandler)
@@ -109,11 +124,11 @@ func (r *HNReminder) onReqResetRemindHandler(c *gin.Context) {
 }
 
 type _Config struct {
-	BreakIntervalSec        int    `yaml:"break_interval_sec"`
-	AlwaysRemindIntervalSec int    `yaml:"always_remind_interval_sec"`
-	ApiPort                 string `yaml:"api_port"`
+	BreakIntervalSec        int    `yaml:"break_interval_sec" json:"breakIntervalSec"`
+	AlwaysRemindIntervalSec int    `yaml:"always_remind_interval_sec" json:"alwaysRemindIntervalSec"`
+	ApiPort                 string `yaml:"api_port" json:"apiPort"`
 
-	Logging logger.Config `yaml:"logging,omitempty"`
+	Logging logger.Config `yaml:"logging,omitempty" json:"-"`
 }
 
 func (r *HNReminder) loadConfigFile(configFile string) base.Result {
@@ -157,13 +172,13 @@ func (r *HNReminder) checkReminder() {
 
 	now := time.Now()
 	if r.shouldRemind {
-		logger.Warnw("HydrateNow: shouldRemind", nil)
+		//logger.Warnw("HydrateNow: shouldRemind", nil)
 		if now.Sub(r.lastRemindTime) > time.Duration(r.config.AlwaysRemindIntervalSec)*time.Second {
-			logger.Warnw("HydrateNow: showReminder", nil)
+			//logger.Warnw("HydrateNow: showReminder", nil)
 			r.showReminder()
 		}
 	} else {
-		logger.Warnw("HydrateNow: check BreakTime", nil)
+		//logger.Warnw("HydrateNow: check BreakTime", nil)
 		if now.Sub(r.lastBreakTime) > time.Duration(r.config.BreakIntervalSec)*time.Second {
 			logger.Infow("HydrateNow: break time")
 			r.shouldRemind = true

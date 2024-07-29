@@ -1,4 +1,4 @@
 @echo off
 
-%~dp0\..\pc_monitor.exe stop
+%~dp0\..\hydrate_pc.exe stop
 pause

@@ -32,6 +32,16 @@ func RedirectLogToFile() {
 	logger.Infow("Logging to " + logFilePath)
 }
 
+func getConfigFilePath() string {
+	exePath, err := os.Executable()
+	if err != nil {
+		logger.Warnw("failed to get executable path", err)
+		return ConfigFileName
+	} else {
+		return filepath.Join(filepath.Dir(exePath), ConfigFileName)
+	}
+}
+
 type MessageSender interface {
 	Show(message string) // 有可能阻塞显示
 	Close()
