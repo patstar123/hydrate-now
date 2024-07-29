@@ -1,16 +1,18 @@
 package pkg
 
 import (
+	"fmt"
 	"github.com/kardianos/service"
 	"github.com/livekit/protocol/logger"
 	"github.com/patstar123/go-base"
 	"os"
-	"path/filepath"
 )
 
 // 以服务形式后台运行，但在消息通知方面遇到了些问题，代码暂存后面再解决
 
 func RunService(loadBuilding func()) {
+	fmt.Println("!!! Run as service")
+
 	RedirectLogToFile()
 	loadBuilding()
 	base.InitDefaultLogger()
@@ -19,9 +21,9 @@ func RunService(loadBuilding func()) {
 	reminder := GetHNReminder()
 	defer reminder.Release()
 
-	sender := NewNotificationSender("HydrateNow")
+	sender := NewNotificationSender(AppName)
 
-	configFile := getConfigFile()
+	configFile := getConfigFilePath()
 	if true {
 		if res := reminder.Init(configFile, nil, sender); !res.IsOk() {
 			logger.Warnw("reminder init with error", res)
@@ -128,16 +130,6 @@ func createService() service.Service {
 		os.Exit(1)
 	}
 	return s
-}
-
-func getConfigFile() string {
-	exePath, err := os.Executable()
-	if err != nil {
-		logger.Warnw("failed to get executable path", err)
-		return ConfigFileName
-	} else {
-		return filepath.Join(filepath.Dir(exePath), ConfigFileName)
-	}
 }
 
 var svcConfig = &service.Config{

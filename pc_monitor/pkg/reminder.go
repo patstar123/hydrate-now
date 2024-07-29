@@ -10,7 +10,10 @@ import (
 	"time"
 )
 
-const ConfigFileName = "config.yaml"
+const (
+	ConfigFileName = "config.yaml"
+	AppName        = "HydrateNow"
+)
 
 type HNReminder struct {
 	config    _Config
@@ -54,7 +57,7 @@ func (r *HNReminder) Init(configFile string, external *ServiceLogger, msgSender 
 		}
 	}
 
-	logger.Warnw("loadConfigFile", nil, "config", r.config, "file", configFile)
+	logger.Infow("loadConfigFile", "config", r.config, "file", configFile)
 
 	r.initHttp()
 	r.msgSender = msgSender
@@ -109,11 +112,11 @@ func (r *HNReminder) onReqResetRemindHandler(c *gin.Context) {
 }
 
 type _Config struct {
-	BreakIntervalSec        int    `yaml:"break_interval_sec"`
-	AlwaysRemindIntervalSec int    `yaml:"always_remind_interval_sec"`
-	ApiPort                 string `yaml:"api_port"`
+	BreakIntervalSec        int    `yaml:"break_interval_sec" json:"breakIntervalSec"`
+	AlwaysRemindIntervalSec int    `yaml:"always_remind_interval_sec" json:"alwaysRemindIntervalSec"`
+	ApiPort                 string `yaml:"api_port" json:"apiPort"`
 
-	Logging logger.Config `yaml:"logging,omitempty"`
+	Logging logger.Config `yaml:"logging,omitempty" json:"-"`
 }
 
 func (r *HNReminder) loadConfigFile(configFile string) base.Result {

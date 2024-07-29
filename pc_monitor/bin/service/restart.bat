@@ -1,4 +1,4 @@
 @echo off
 
-%~dp0\..\pc_monitor.exe restart
+%~dp0\..\hydrate_pc.exe restart
 pause

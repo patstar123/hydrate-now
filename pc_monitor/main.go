@@ -9,10 +9,16 @@ import (
 	"syscall"
 )
 
+var IsTrayBuilding = "true"
+
 var commands = map[string][]any{
+	"": {"Run this program as service", run},
+
 	"run": {"Run this program directly instead of as service", runDirectly},
 
-	"":          {"Run this program as service", pkg.RunService},
+	"autostart-on":  {"Add auto start to regedit", pkg.AddAutoStart},
+	"autostart-off": {"Remove auto start from regedit", pkg.RemoveAutoStart},
+
 	"install":   {"Install this service", pkg.InstallService},
 	"uninstall": {"Uninstall this service", pkg.UninstallService},
 	"start":     {"Start this service", pkg.StartService},
@@ -46,13 +52,21 @@ func main() {
 	})
 }
 
+func run(loadBuilding func()) {
+	if IsTrayBuilding == "true" {
+		pkg.RunAsTray(loadBuilding)
+	} else {
+		pkg.RunService(loadBuilding)
+	}
+}
+
 func runDirectly(loadBuilding func()) {
 	loadBuilding()
 
 	reminder := pkg.GetHNReminder()
 	defer reminder.Release()
 
-	sender := pkg.NewMessageBoxSender("HydrateNow")
+	sender := pkg.NewMessageBoxSender(pkg.AppName)
 
 	if res := reminder.Init(pkg.ConfigFileName, nil, sender); !res.IsOk() {
 		logger.Warnw("reminder init with error", res)

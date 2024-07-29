@@ -1,6 +1,6 @@
 @echo off
 
-%~dp0\..\pc_monitor.exe stop
-%~dp0\..\pc_monitor.exe uninstall
+%~dp0\..\hydrate_pc.exe stop
+%~dp0\..\hydrate_pc.exe uninstall
 sc delete HydrateNowService
 pause
