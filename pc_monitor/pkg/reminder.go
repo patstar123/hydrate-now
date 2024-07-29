@@ -1,36 +1,36 @@
 package pkg
 
 import (
-	"flag"
 	"github.com/gin-gonic/gin"
 	"github.com/livekit/protocol/logger"
 	"github.com/patstar123/go-base"
 	bu "github.com/patstar123/go-base/utils"
 	"net/http"
 	"sync"
-	"syscall"
 	"time"
-	"unsafe"
 )
 
+const ConfigFileName = "config.yaml"
+
 type HNReminder struct {
-	config     _Config
-	configFile *string
-	http       *gin.Engine
-	running    bool
+	config    _Config
+	http      *gin.Engine
+	running   bool
+	msgSender MessageSender
 
 	mutex          sync.Mutex
 	lastBreakTime  time.Time
 	lastRemindTime time.Time
 	shouldRemind   bool
+	shownRemind    bool
 }
 
 var (
 	gReminder = &HNReminder{
-		configFile:   flag.String("config", "./config.yaml", "配置文件地址"),
 		running:      false,
 		mutex:        sync.Mutex{},
 		shouldRemind: false,
+		shownRemind:  false,
 	}
 )
 
@@ -38,14 +38,8 @@ func GetHNReminder() *HNReminder {
 	return gReminder
 }
 
-func (r *HNReminder) Init(external *ServiceLogger) base.Result {
-	flag.Parse()
-
-	if r.configFile == nil {
-		return base.INVALID_PARAM.AppendMsg("lost command line params: `config`")
-	}
-
-	res := r.loadConfigFile(*r.configFile)
+func (r *HNReminder) Init(configFile string, external *ServiceLogger, msgSender MessageSender) base.Result {
+	res := r.loadConfigFile(configFile)
 	if !res.IsOk() {
 		return res
 	}
@@ -60,25 +54,27 @@ func (r *HNReminder) Init(external *ServiceLogger) base.Result {
 		}
 	}
 
+	logger.Warnw("loadConfigFile", nil, "config", r.config, "file", configFile)
+
 	r.initHttp()
+	r.msgSender = msgSender
 
 	logger.Infow("init successfully")
 	return base.SUCCESS
 }
 
 func (r *HNReminder) Run() base.Result {
-	logger.Infow("try to run in http loop")
-
 	r.running = true
+	defer func() { r.running = false }()
 	go r.remindingCheckLoop()
 
+	logger.Infow("run in http loop")
 	err := r.http.Run(":" + r.config.ApiPort)
 	if err != nil {
 		return base.INTERNAL_ERROR.AppendErr("run http server error", err)
 	}
-
-	r.running = false
 	logger.Infow("exit from http loop")
+
 	return base.SUCCESS
 }
 
@@ -94,7 +90,7 @@ func (r *HNReminder) Release() base.Result {
 
 func (r *HNReminder) initHttp() {
 	r.http = bu.CreateGinHttp(nil)
-	r.http.POST("/reset_remind", r.onReqResetRemindHandler)
+	r.http.Any("/reset_remind", r.onReqResetRemindHandler)
 }
 
 func (r *HNReminder) onReqResetRemindHandler(c *gin.Context) {
@@ -104,7 +100,12 @@ func (r *HNReminder) onReqResetRemindHandler(c *gin.Context) {
 
 	r.shouldRemind = false
 	r.lastBreakTime = time.Now()
-	bu.ReturnRsp(c, http.StatusOK, "Break reminder reset")
+	bu.ReturnRsp(c, http.StatusOK, "Good boy")
+
+	logger.Infow("HydrateNow: good boy")
+	if r.shownRemind {
+		go r.closeReminder()
+	}
 }
 
 type _Config struct {
@@ -133,12 +134,11 @@ func (r *HNReminder) loadConfigFile(configFile string) base.Result {
 		r.config.ApiPort = "18081"
 	}
 
-	logger.Infow("loadConfigFile", "config", r.config)
 	return base.SUCCESS
 }
 
 func (r *HNReminder) remindingCheckLoop() {
-	timer := time.NewTimer(time.Second)
+	timer := time.NewTicker(time.Second)
 	defer timer.Stop()
 
 	r.shouldRemind = false
@@ -157,32 +157,41 @@ func (r *HNReminder) checkReminder() {
 
 	now := time.Now()
 	if r.shouldRemind {
+		logger.Warnw("HydrateNow: shouldRemind", nil)
 		if now.Sub(r.lastRemindTime) > time.Duration(r.config.AlwaysRemindIntervalSec)*time.Second {
-			r.lastRemindTime = now
+			logger.Warnw("HydrateNow: showReminder", nil)
 			r.showReminder()
 		}
 	} else {
+		logger.Warnw("HydrateNow: check BreakTime", nil)
 		if now.Sub(r.lastBreakTime) > time.Duration(r.config.BreakIntervalSec)*time.Second {
+			logger.Infow("HydrateNow: break time")
 			r.shouldRemind = true
-			r.lastRemindTime = now
 			r.showReminder()
 		}
 	}
 }
 
-const (
-	MB_OK              = 0x00000000
-	MB_ICONINFORMATION = 0x00000040
-	MB_SYSTEMMODAL     = 0x00001000
-)
-
-var user32 = syscall.NewLazyDLL("user32.dll")
-var msgBox = user32.NewProc("MessageBoxW")
+const message = "你已经工作了一段时间，请站起来去喝水。"
 
 func (r *HNReminder) showReminder() {
-	title, _ := syscall.UTF16PtrFromString("休息提醒")
-	message, _ := syscall.UTF16PtrFromString("你已经工作了一段时间，请站起来去喝水。")
-	msgBox.Call(0,
-		uintptr(unsafe.Pointer(message)), uintptr(unsafe.Pointer(title)),
-		MB_OK|MB_ICONINFORMATION|MB_SYSTEMMODAL)
+	if r.shownRemind {
+		return
+	}
+
+	r.shownRemind = true
+	go func() {
+		r.msgSender.Show(message)
+
+		r.mutex.Lock()
+		defer r.mutex.Unlock()
+		r.lastRemindTime = time.Now()
+		r.shownRemind = false
+	}()
+}
+
+func (r *HNReminder) closeReminder() {
+	if r.shownRemind {
+		r.msgSender.Close()
+	}
 }

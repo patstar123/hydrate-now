@@ -1,11 +1,12 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="pc_monitor" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="hydrate-now" />
-    <working_directory value="$PROJECT_DIR$/pc_monitor" />
+    <working_directory value="$PROJECT_DIR$/pc_monitor/bin" />
+    <parameters value="run" />
     <kind value="PACKAGE" />
     <package value="lx/funny/hydrate/pc_monitor" />
     <directory value="$PROJECT_DIR$" />
-    <output_directory value="$PROJECT_DIR$/pc_monitor" />
+    <output_directory value="$PROJECT_DIR$/pc_monitor/bin" />
     <method v="2" />
   </configuration>
 </component>
