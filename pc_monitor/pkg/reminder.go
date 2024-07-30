@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/livekit/protocol/logger"
 	"github.com/patstar123/go-base"
 	bu "github.com/patstar123/go-base/utils"
@@ -69,7 +70,9 @@ func (r *HNReminder) Init(configFile string, external *ServiceLogger, msgSender 
 func (r *HNReminder) Run() base.Result {
 	r.running = true
 	defer func() { r.running = false }()
+
 	go r.remindingCheckLoop()
+	go r.connect2Router()
 
 	logger.Infow("run in http loop")
 	err := r.http.Run(":" + r.config.ApiPort)
@@ -108,25 +111,83 @@ func (r *HNReminder) initHttp() {
 	r.http.Any("/reset_remind", r.onReqResetRemindHandler)
 }
 
+func (r *HNReminder) connect2Router() {
+	if r.config.RouterUrl == "" {
+		logger.Warnw("there is no route url, so it would work in standalone mode", nil)
+		return
+	}
+
+	logger.Infow("Connecting to router: " + r.config.RouterUrl)
+	c, _, err := websocket.DefaultDialer.Dial(r.config.RouterUrl, nil)
+	if err != nil {
+		logger.Warnw("ws dial failed", err)
+		r.delay2ReconnectRouter()
+		return
+	}
+	defer c.Close()
+
+	err = c.WriteJSON(r.config.ClientId)
+	if err != nil {
+		logger.Warnw("ws write client id failed", err)
+		r.delay2ReconnectRouter()
+		return
+	}
+
+	for {
+		_, message, err := c.ReadMessage()
+		if err != nil {
+			logger.Warnw("ws read error", err)
+			r.delay2ReconnectRouter()
+			return
+		}
+
+		logger.Debugw("ws received: " + string(message))
+		if string(message) == "reset_remind" {
+			err = c.WriteMessage(websocket.TextMessage, []byte("Good boy"))
+			if err != nil {
+				logger.Warnw("ws write rsp failed", err)
+				r.delay2ReconnectRouter()
+				return
+			}
+			r.resetRemind()
+		}
+	}
+}
+
 func (r *HNReminder) onReqResetRemindHandler(c *gin.Context) {
 	bu.LogHttpRequest(nil)
+	bu.ReturnRsp(c, http.StatusOK, "Good boy")
+	r.resetRemind()
+}
+
+func (r *HNReminder) delay2ReconnectRouter() {
+	go func() {
+		time.Sleep(5 * time.Second)
+		r.connect2Router()
+	}()
+}
+
+func (r *HNReminder) resetRemind() {
+	logger.Infow("HydrateNow: good boy")
+
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	r.shouldRemind = false
 	r.lastBreakTime = time.Now()
-	bu.ReturnRsp(c, http.StatusOK, "Good boy")
 
-	logger.Infow("HydrateNow: good boy")
 	if r.shownRemind {
 		go r.closeReminder()
 	}
 }
 
 type _Config struct {
-	BreakIntervalSec        int    `yaml:"break_interval_sec" json:"breakIntervalSec"`
-	AlwaysRemindIntervalSec int    `yaml:"always_remind_interval_sec" json:"alwaysRemindIntervalSec"`
-	ApiPort                 string `yaml:"api_port" json:"apiPort"`
+	BreakIntervalSec        int    `yaml:"break_interval_sec"`
+	AlwaysRemindIntervalSec int    `yaml:"always_remind_interval_sec"`
+	ApiPort                 string `yaml:"api_port"`
+
+	ClientId  string `yaml:"client_id"`
+	RouterUrl string `yaml:"router_url"`
 
 	Logging logger.Config `yaml:"logging,omitempty" json:"-"`
 }
@@ -147,6 +208,15 @@ func (r *HNReminder) loadConfigFile(configFile string) base.Result {
 
 	if r.config.ApiPort == "" {
 		r.config.ApiPort = "18081"
+	}
+
+	if r.config.ClientId == "" {
+		logger.Warnw("not config client_id", nil)
+		return base.INVALID_PARAM
+	}
+
+	if r.config.RouterUrl == "" {
+		logger.Warnw("not config router_url", nil)
 	}
 
 	return base.SUCCESS

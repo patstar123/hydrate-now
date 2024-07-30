@@ -1,17 +1,5 @@
-# 提醒休息的间隔时间(以秒为单位，默认1小时)
-break_interval_sec: 3600
-
-# 关闭弹框后再次提醒的间隔(以秒为单位，默认10秒)
-always_remind_interval_sec: 10
-
-# API端口(http)，默认18081
-api_port: 18081
-
-# 客户端ID(即注册的用户名)
-client_id: patstar123
-
-# 消息路由的订阅地址
-router_url: ws://abbs.fun:28081/sub_msg
+# API端口(http)，默认28081
+api_port: 28081
 
 # Logging config
 logging:
