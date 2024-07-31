@@ -6,7 +6,10 @@ import (
 	"github.com/livekit/protocol/logger"
 	"github.com/patstar123/go-base"
 	bu "github.com/patstar123/go-base/utils"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -63,7 +66,15 @@ func (r *HNReminder) Init(configFile string, external *ServiceLogger, msgSender 
 	r.initHttp()
 	r.msgSender = msgSender
 
-	logger.Infow("init successfully")
+	r.shouldRemind = false
+	lastBreakTime := getLastBreakTimeFromTemp()
+	if lastBreakTime != nil {
+		r.lastBreakTime = *lastBreakTime
+	} else {
+		r.resetLastBreakTime()
+	}
+
+	logger.Infow("init successfully", "lastBreakTime", r.lastBreakTime)
 	return base.SUCCESS
 }
 
@@ -174,7 +185,7 @@ func (r *HNReminder) resetRemind() {
 	defer r.mutex.Unlock()
 
 	r.shouldRemind = false
-	r.lastBreakTime = time.Now()
+	r.resetLastBreakTime()
 
 	if r.shownRemind {
 		go r.closeReminder()
@@ -226,8 +237,6 @@ func (r *HNReminder) remindingCheckLoop() {
 	timer := time.NewTicker(time.Second)
 	defer timer.Stop()
 
-	r.shouldRemind = false
-	r.lastBreakTime = time.Now()
 	for r.running {
 		select {
 		case <-timer.C:
@@ -278,5 +287,47 @@ func (r *HNReminder) showReminder() {
 func (r *HNReminder) closeReminder() {
 	if r.shownRemind {
 		r.msgSender.Close()
+	}
+}
+
+func (r *HNReminder) resetLastBreakTime() {
+	r.lastBreakTime = time.Now()
+	saveLastBreakTimeToTemp(&r.lastBreakTime)
+}
+
+func getLastBreakTimeFromTemp() *time.Time {
+	lastFile := filepath.Join(os.TempDir(), "hydrate_now.last_break")
+	if _, err := os.Stat(lastFile); os.IsNotExist(err) {
+		return nil
+	}
+
+	content, err := ioutil.ReadFile(lastFile)
+	if err != nil {
+		logger.Warnw("failed to read last break time from temp file", err)
+		return nil
+	}
+
+	lastTime := &time.Time{}
+	err = lastTime.UnmarshalText(content)
+	if err != nil {
+		logger.Warnw("failed to UnmarshalText for last break time", err)
+		return nil
+	}
+
+	return lastTime
+}
+
+func saveLastBreakTimeToTemp(time *time.Time) {
+	content, err := time.MarshalText()
+	if err != nil {
+		logger.Warnw("failed to MarshalText for last break time", err)
+		return
+	}
+
+	lastFile := filepath.Join(os.TempDir(), "hydrate_now.last_break")
+	err = ioutil.WriteFile(lastFile, content, 0644)
+	if err != nil {
+		logger.Warnw("failed to update last break time to temp file", err)
+		return
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/patstar123/go-base"
 	"golang.org/x/sys/windows/registry"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -128,13 +127,15 @@ func onReady() {
 }
 
 func onExit() {
+	logger.Infow("tray exited")
 	GetHNReminder().Release()
 }
 
 func getIcon() []byte {
-	data, err := ioutil.ReadFile("favicon.ico")
+	data, err := ioutil.ReadFile(getIconFilePath())
 	if err != nil {
-		log.Fatal(err)
+		logger.Warnw("failed to get favicon.ico", err)
+		return []byte{}
 	}
 	return data
 }

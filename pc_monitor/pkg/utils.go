@@ -42,6 +42,18 @@ func getConfigFilePath() string {
 	}
 }
 
+func getIconFilePath() string {
+	filename := "favicon.ico"
+
+	exePath, err := os.Executable()
+	if err != nil {
+		logger.Warnw("failed to get executable path", err)
+		return filename
+	} else {
+		return filepath.Join(filepath.Dir(exePath), filename)
+	}
+}
+
 type MessageSender interface {
 	Show(message string) // 有可能阻塞显示
 	Close()
